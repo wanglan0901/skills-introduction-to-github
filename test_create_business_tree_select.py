@@ -1,10 +1,15 @@
 from playwright.sync_api import sync_playwright
 import time
 import random
+import os
+
+# CI 环境自动切换为无头模式，本地运行保持有头模式
+HEADLESS = os.environ.get('CI') is not None or os.environ.get('HEADLESS', '').lower() == 'true'
+SCREENSHOT_DIR = os.environ.get('SCREENSHOT_DIR', os.path.dirname(os.path.abspath(__file__)))
 
 def test_create_business():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, slow_mo=300)
+        browser = p.chromium.launch(headless=HEADLESS, slow_mo=0 if HEADLESS else 300)
         context = browser.new_context()
         page = context.new_page()
         
@@ -76,7 +81,7 @@ def test_create_business():
             else:
                 print("⚠️ 页面可能未正确加载商家管理内容")
             
-            page.screenshot(path='/Users/lanwang/Documents/trae_projects/new World/step4_business_page.png')
+            page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'step4_business_page.png'))
             
             # 5. 点击添加商家按钮
             print("\n步骤5: 点击添加商家按钮")
@@ -101,7 +106,7 @@ def test_create_business():
             
             if add_btn is None:
                 print("✗ 未找到添加商家按钮，截图保存")
-                page.screenshot(path='/Users/lanwang/Documents/trae_projects/new World/step5_no_button.png')
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'step5_no_button.png'))
                 return
             
             add_btn.click()
@@ -122,7 +127,7 @@ def test_create_business():
                     print("✓ Drawer已出现")
                 except:
                     print("✗ 未找到弹窗或Drawer")
-                    page.screenshot(path='/Users/lanwang/Documents/trae_projects/new World/step6_no_modal.png')
+                    page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'step6_no_modal.png'))
                     return
             
             # 7. 选择部门（树形选择器）
@@ -237,7 +242,7 @@ def test_create_business():
             
             # 截图确认
             page.wait_for_timeout(1000)
-            page.screenshot(path='/Users/lanwang/Documents/trae_projects/new World/tree_form.png')
+            page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'tree_form.png'))
             print("✓ 已保存表单截图: tree_form.png")
             
             # 9. 点击确认按钮
@@ -270,7 +275,7 @@ def test_create_business():
             page.wait_for_timeout(3000)
             
             # 截图
-            page.screenshot(path='/Users/lanwang/Documents/trae_projects/new World/tree_result.png')
+            page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'tree_result.png'))
             print("✓ 已保存结果截图: tree_result.png")
             
             # 检查结果 - 弹窗是否关闭
@@ -362,7 +367,7 @@ def test_create_business():
                     print("✓ 成功点击编辑按钮")
                 else:
                     print("✗ 未找到编辑按钮")
-                    page.screenshot(path='/Users/lanwang/Documents/trae_projects/new World/edit_no_button.png')
+                    page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'edit_no_button.png'))
                     return
                 
                 # E2. 等待编辑弹窗出现
@@ -378,10 +383,10 @@ def test_create_business():
                         print("✓ 编辑Drawer已出现")
                     except:
                         print("✗ 未找到编辑弹窗")
-                        page.screenshot(path='/Users/lanwang/Documents/trae_projects/new World/edit_no_modal.png')
+                        page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'edit_no_modal.png'))
                         return
                 
-                page.screenshot(path='/Users/lanwang/Documents/trae_projects/new World/edit_before.png')
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'edit_before.png'))
                 print("✓ 已保存编辑前截图: edit_before.png")
                 
                 # E3. 修改商家名称
@@ -520,7 +525,7 @@ def test_create_business():
                 
                 # 编辑表单截图
                 page.wait_for_timeout(1000)
-                page.screenshot(path='/Users/lanwang/Documents/trae_projects/new World/edit_form.png')
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'edit_form.png'))
                 print("✓ 已保存编辑表单截图: edit_form.png")
                 
                 # E9. 点击确认按钮
@@ -552,7 +557,7 @@ def test_create_business():
                 print("\n编辑步骤E10: 等待编辑处理结果")
                 page.wait_for_timeout(3000)
                 
-                page.screenshot(path='/Users/lanwang/Documents/trae_projects/new World/edit_result.png')
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'edit_result.png'))
                 print("✓ 已保存编辑结果截图: edit_result.png")
                 
                 # 检查编辑结果
@@ -574,7 +579,7 @@ def test_create_business():
         except Exception as e:
             print(f"\n✗ 测试过程中出现错误: {str(e)}")
             try:
-                page.screenshot(path='/Users/lanwang/Documents/trae_projects/new World/tree_error.png')
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'tree_error.png'))
                 print("  错误截图已保存: tree_error.png")
             except:
                 pass
