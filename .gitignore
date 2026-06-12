@@ -1,0 +1,36 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Test artifacts - screenshots
+*.png
+*.jpg
+
+# Debug files
+*.html
+
+# Temp files
+~*
+.~*
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+.trae/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
