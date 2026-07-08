@@ -9,7 +9,7 @@ SCREENSHOT_DIR = os.environ.get('SCREENSHOT_DIR', os.path.dirname(os.path.abspat
 
 def test_create_business():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=HEADLESS, slow_mo=0 if HEADLESS else 300)
+        browser = p.chromium.launch(headless=HEADLESS, slow_mo=0 if HEADLESS else 300, channel='chrome')
         context = browser.new_context()
         page = context.new_page()
         
@@ -561,6 +561,7 @@ def test_create_business():
                 print("✓ 已保存编辑结果截图: edit_result.png")
                 
                 # 检查编辑结果
+                edited_success = False
                 try:
                     if edit_modal.is_visible():
                         print("⚠️ 编辑弹窗仍在显示")
@@ -573,8 +574,374 @@ def test_create_business():
                             print(f"  提示信息: {msg.text_content()}")
                     else:
                         print("✓✓✓ 编辑商家成功！弹窗已关闭 ✓✓✓")
+                        edited_success = True
                 except:
                     print("✓✓✓ 编辑商家成功！弹窗已关闭（页面更新）✓✓✓")
+                    edited_success = True
+            
+            # ===================================================================
+            # 第三部分：添加店铺
+            # ===================================================================
+            if edited_success:
+                print("\n" + "="*60)
+                print("开始执行：添加店铺自动化测试")
+                print("="*60)
+                
+                page.wait_for_timeout(3000)
+                page.wait_for_load_state('networkidle')
+                
+                # S1. 搜索编辑后的商家，点击详情按钮
+                print("\n店铺步骤S1: 查找编辑后的商家并点击详情按钮")
+                
+                # 先清空搜索框重新搜索编辑后的商家
+                try:
+                    search_input = page.locator('input[placeholder*="搜索"]').first
+                    if search_input.count() == 0:
+                        search_input = page.locator('input[placeholder*="请输入"]').first
+                    if search_input.count() > 0:
+                        search_input.click()
+                        search_input.fill('')
+                        search_input.fill(edit_name)
+                        page.keyboard.press('Enter')
+                        page.wait_for_timeout(2000)
+                        print(f"  搜索编辑后的商家: {edit_name}")
+                except:
+                    print("  ⚠️ 搜索框不可用，尝试直接定位表格行")
+                
+                # 查找详情按钮
+                detail_btn = None
+                detail_selectors = [
+                    f'tr:has-text("{edit_name}") button:has-text("详情")',
+                    f'tr:has-text("{edit_name}") a:has-text("详情")',
+                    f'[class*="row"]:has-text("{edit_name}") button:has-text("详情")',
+                    f'tr:has-text("{edit_name}") [class*="detail"]',
+                ]
+                
+                for selector in detail_selectors:
+                    try:
+                        loc = page.locator(selector).first
+                        if loc.count() > 0 and loc.is_visible():
+                            detail_btn = loc
+                            print(f"  使用选择器找到详情按钮: {selector}")
+                            break
+                    except:
+                        continue
+                
+                if detail_btn is None:
+                    all_detail_btns = page.locator('button:has-text("详情"), a:has-text("详情")').all()
+                    for btn in all_detail_btns:
+                        try:
+                            row = btn.locator('xpath=ancestor::tr').first
+                            if row.count() > 0 and edit_name in (row.text_content() or ''):
+                                detail_btn = btn
+                                break
+                        except:
+                            continue
+                
+                if detail_btn:
+                    detail_btn.click()
+                    page.wait_for_timeout(3000)
+                    page.wait_for_load_state('networkidle')
+                    print("✓ 成功点击详情按钮，已进入商家详情页")
+                else:
+                    print("✗ 未找到详情按钮")
+                    page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'shop_no_detail_button.png'))
+                    return
+                
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'shop_detail_page.png'))
+                print("✓ 已保存详情页截图: shop_detail_page.png")
+                
+                # S2. 点击"+新增店铺"按钮
+                print("\n店铺步骤S2: 点击'+新增店铺'按钮")
+                
+                add_shop_btn = None
+                shop_btn_selectors = [
+                    'button:has-text("新增店铺")',
+                    'button:has-text("添加店铺")',
+                    'button:has-text("+新增店铺")',
+                    'button:has-text("新建店铺")',
+                    '.ant-btn-primary:has-text("新增")',
+                ]
+                
+                for selector in shop_btn_selectors:
+                    try:
+                        loc = page.locator(selector).first
+                        if loc.count() > 0 and loc.is_visible():
+                            add_shop_btn = loc
+                            print(f"  使用选择器找到按钮: {selector}")
+                            break
+                    except:
+                        continue
+                
+                if add_shop_btn:
+                    add_shop_btn.click()
+                    page.wait_for_timeout(3000)
+                    print("✓ 成功点击'+新增店铺'按钮")
+                else:
+                    print("✗ 未找到新增店铺按钮")
+                    page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'shop_no_add_button.png'))
+                    return
+                
+                # S3. 等待店铺弹窗出现
+                print("\n店铺步骤S3: 等待店铺弹窗出现")
+                try:
+                    shop_modal = page.locator('.ant-modal').first
+                    shop_modal.wait_for(timeout=10000)
+                    print("✓ 新增店铺弹窗已出现")
+                except:
+                    try:
+                        shop_modal = page.locator('.ant-drawer').first
+                        shop_modal.wait_for(timeout=5000)
+                        print("✓ 新增店铺Drawer已出现")
+                    except:
+                        print("✗ 未找到新增店铺弹窗")
+                        page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'shop_no_modal.png'))
+                        return
+                
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'shop_modal_empty.png'))
+                
+                # S4. 填写店铺名称
+                print("\n店铺步骤S4: 填写店铺名称")
+                shop_unique_suffix = f'{int(time.time())}{random.randint(100, 999)}'
+                shop_name = f'测试店铺_{shop_unique_suffix}'
+                
+                # 尝试多种定位策略查找店铺名称输入框
+                name_input = shop_modal.locator('#shopName')
+                if name_input.count() == 0:
+                    name_input = shop_modal.locator('[placeholder*="店铺名称"]')
+                if name_input.count() == 0:
+                    name_input = shop_modal.locator('[placeholder*="店铺"]')
+                if name_input.count() == 0:
+                    # 可能是弹窗中第一个普通input
+                    inputs = shop_modal.locator('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])').all()
+                    if len(inputs) > 0:
+                        name_input = inputs[0]
+                
+                if name_input.count() > 0:
+                    name_input.click()
+                    name_input.fill(shop_name)
+                    print(f"✓ 店铺名称: {shop_name}")
+                else:
+                    print("✗ 未找到店铺名称输入框")
+                
+                # S5. 下拉选择"平台"
+                print("\n店铺步骤S5: 下拉选择'平台'")
+                
+                def select_dropdown_option(modal, select_locator, label):
+                    """通用下拉选择函数：点击选择器，等待下拉面板展开，选择第一个非已选中的选项"""
+                    try:
+                        select_locator.click()
+                        page.wait_for_timeout(800)
+                        # 等待可见的下拉面板出现
+                        try:
+                            dropdown = page.locator('.ant-select-dropdown:visible').first
+                            dropdown.wait_for(timeout=5000)
+                            page.wait_for_timeout(500)
+                        except:
+                            pass
+                        # 仅在可见下拉面板中查找选项
+                        options = page.locator('.ant-select-dropdown:visible .ant-select-item-option:not(.ant-select-item-option-selected)').all()
+                        if len(options) == 0:
+                            options = page.locator('.ant-select-dropdown:visible .ant-select-item-option').all()
+                        if len(options) > 0:
+                            options[0].click()
+                            page.wait_for_timeout(500)
+                            print(f"  ✓ 已选择{label}")
+                            return True
+                    except Exception as e:
+                        print(f"  ⚠️ {label}选择异常: {e}")
+                    return False
+                
+                # 获取弹窗中所有ant-select下拉框
+                all_selects = shop_modal.locator('.ant-select').all()
+                print(f"  弹窗中共找到 {len(all_selects)} 个下拉框")
+                
+                # 平台选第一个下拉框
+                if len(all_selects) >= 1:
+                    select_dropdown_option(shop_modal, all_selects[0], "平台")
+                
+                # S6. 下拉选择"合作状态"
+                print("\n店铺步骤S6: 下拉选择'合作状态'")
+                
+                if len(all_selects) >= 2:
+                    select_dropdown_option(shop_modal, all_selects[1], "合作状态")
+                else:
+                    print("  ⚠️ 合作状态下拉选择失败：下拉框数量不足")
+                
+                # S7. 合作周期（日期选择器）
+                print("\n店铺步骤S7: 选择合作周期（日期选择器）")
+                date_selected = False
+                
+                # 查找日期选择器 - 可能是范围选择器
+                date_selectors = [
+                    '#cooperationPeriod',
+                    '[data-field="cooperationPeriod"]',
+                    '[placeholder*="合作周期"]',
+                    '.ant-picker-range',
+                    '.ant-date-picker',
+                ]
+                
+                date_input = None
+                for selector in date_selectors:
+                    try:
+                        loc = shop_modal.locator(selector).first
+                        if loc.count() > 0:
+                            date_input = loc
+                            print(f"  找到日期选择器: {selector}")
+                            break
+                    except:
+                        continue
+                
+                if date_input:
+                    date_input.click()
+                    page.wait_for_timeout(1000)
+                    
+                    # 处理日期选择器弹窗
+                    # 先点击今天的日期作为开始
+                    try:
+                        today_cell = page.locator('.ant-picker-cell-today').first
+                        if today_cell.count() > 0:
+                            today_cell.click()
+                            page.wait_for_timeout(500)
+                            print("  ✓ 已选择开始日期")
+                            date_selected = True
+                        else:
+                            # 点击第一个可用日期
+                            first_cell = page.locator('.ant-picker-cell:not(.ant-picker-cell-disabled)').first
+                            if first_cell.count() > 0:
+                                first_cell.click()
+                                page.wait_for_timeout(500)
+                                print("  ✓ 已选择开始日期（首个可用）")
+                                date_selected = True
+                    except:
+                        pass
+                    
+                    # 如果是范围选择器，还需要选结束日期
+                    try:
+                        # 再点击一个后面的日期作为结束
+                        end_cells = page.locator('.ant-picker-cell:not(.ant-picker-cell-disabled)').all()
+                        if len(end_cells) > 2:
+                            end_cells[min(5, len(end_cells)-1)].click()
+                            page.wait_for_timeout(500)
+                            print("  ✓ 已选择结束日期")
+                    except:
+                        pass
+                else:
+                    print("  ⚠️ 未找到日期选择器，跳过")
+                
+                # S8. 部门（树形选择器）
+                print("\n店铺步骤S8: 选择部门（树形选择器）")
+                shop_dept = None
+                for selector in ['.ant-tree-select', '[class*="tree-select"]']:
+                    try:
+                        loc = shop_modal.locator(selector).first
+                        if loc.count() > 0:
+                            shop_dept = loc
+                            break
+                    except:
+                        continue
+                
+                if shop_dept:
+                    shop_dept.click()
+                    print("✓ 点击部门树形选择框")
+                    page.wait_for_timeout(3000)
+                    
+                    tree_nodes = page.locator('.ant-select-tree-treenode').all()
+                    if len(tree_nodes) == 0:
+                        tree_nodes = page.locator('.ant-tree-treenode').all()
+                    if len(tree_nodes) == 0:
+                        tree_nodes = page.locator('[class*="tree-node"]').all()
+                    
+                    print(f"  找到 {len(tree_nodes)} 个树形节点")
+                    
+                    if len(tree_nodes) > 0:
+                        for i, node in enumerate(tree_nodes[:20]):
+                            try:
+                                hidden = page.evaluate(
+                                    '(el) => el.getAttribute("aria-hidden") === "true"',
+                                    node.element_handle()
+                                )
+                                if not hidden and node.is_visible():
+                                    node.click()
+                                    page.wait_for_timeout(500)
+                                    print(f"  ✓ 已选择部门（节点 #{i+1}）")
+                                    break
+                            except:
+                                continue
+                    else:
+                        print("  ⚠️ 未找到树形节点")
+                else:
+                    print("  ⚠️ 未找到部门树形选择器，跳过")
+                
+                # S9. 填写备注
+                print("\n店铺步骤S9: 填写备注")
+                shop_remark = f'店铺备注_{shop_unique_suffix}'
+                
+                remark_input = shop_modal.locator('#remark')
+                if remark_input.count() == 0:
+                    remark_input = shop_modal.locator('[placeholder*="备注"]')
+                if remark_input.count() == 0:
+                    remark_input = shop_modal.locator('textarea').first
+                if remark_input.count() > 0:
+                    remark_input.click()
+                    remark_input.fill(shop_remark)
+                    print(f"✓ 店铺备注: {shop_remark}")
+                else:
+                    print("⚠️ 未找到备注输入框")
+                
+                # 截图表单
+                page.wait_for_timeout(1000)
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'shop_form.png'))
+                print("✓ 已保存店铺表单截图: shop_form.png")
+                
+                # S10. 点击"确定"按钮
+                print("\n店铺步骤S10: 点击'确定'按钮")
+                confirm_selectors = [
+                    'button:has-text("确 定")',
+                    'button:has-text("确定")',
+                    'button:has-text("确 认")',
+                    'button:has-text("确认")',
+                    '.ant-modal-footer .ant-btn-primary',
+                ]
+                
+                confirm_btn = None
+                for selector in confirm_selectors:
+                    try:
+                        loc = shop_modal.locator(selector).first
+                        if loc.count() > 0 and loc.is_visible():
+                            confirm_btn = loc
+                            break
+                    except:
+                        continue
+                
+                if confirm_btn:
+                    confirm_btn.click()
+                    print("✓ 点击确定按钮")
+                else:
+                    print("✗ 未找到确定按钮")
+                
+                # S11. 等待处理结果
+                print("\n店铺步骤S11: 等待处理结果")
+                page.wait_for_timeout(3000)
+                
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, 'shop_result.png'))
+                print("✓ 已保存店铺结果截图: shop_result.png")
+                
+                # 检查结果
+                try:
+                    if shop_modal.is_visible():
+                        print("⚠️ 店铺弹窗仍在显示")
+                        errors = shop_modal.locator('.ant-form-item-explain-error').all()
+                        if errors:
+                            for err in errors:
+                                print(f"  ✗ 表单错误: {err.text_content()}")
+                        messages = page.locator('.ant-message-notice-content').all()
+                        for msg in messages:
+                            print(f"  提示信息: {msg.text_content()}")
+                    else:
+                        print("✓✓✓ 新增店铺成功！弹窗已关闭 ✓✓✓")
+                except:
+                    print("✓✓✓ 新增店铺成功！弹窗已关闭（页面更新）✓✓✓")
                 
         except Exception as e:
             print(f"\n✗ 测试过程中出现错误: {str(e)}")
